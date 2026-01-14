@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fahrtenbuch System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        h1 {
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            text-align: center;
+            padding: 25px;
+            font-size: 2.5em;
+        }
+        .save-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        .save-indicator.show {
+            opacity: 1;
+        }
+        .backup-status {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: white;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            font-size: 14px;
+            z-index: 1000;
+            border: 2px solid #667eea;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal-header {
+            font-size: 1.8em;
+            color: #667eea;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .modal-body {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .tabs {
+            display: flex;
+            background: #f0f0f0;
+            border-bottom: 3px solid #667eea;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            background: #e0e0e0;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #555;
+            transition: all 0.3s;
+            border-right: 1px solid #ccc;
+            white-space: nowrap;
+        }
+        .tab:hover {
+            background: #d0d0d0;
+        }
+        .tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid white;
+            margin-bottom: -3px;
+        }
+        .tab-content {
+            display: none;
+            padding: 30px;
+            animation: fadeIn 0.3s;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .btn-delete {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .weekend {
+            background-color: #fff3cd !important;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .stat-card h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .button-group {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .month-selector {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .month-selector h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .month-checkbox {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .month-checkbox:hover {
+            background: #e8eaf6;
+            transform: translateY(-2px);
+        }
+        .month-checkbox input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .month-checkbox label {
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .jahresauswertung {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .jahresauswertung h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        .auswertung-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .auswertung-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .auswertung-item label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .auswertung-item .value {
+            font-size: 1.5em;
+            color: #667eea;
+            font-weight: bold;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-box h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="save-indicator" id="saveIndicator">💾 Automatisch gespeichert!</div>
+    <div class="backup-status" id="backupStatus">📅 Letztes Backup: Noch keins erstellt</div>
+    
+    <!-- Backup Erinnerung Modal -->
+    <div id="backupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">📅 Monatsbackup erstellen?</div>
+            <div class="modal-body">
+                <p>Es ist Zeit für dein monatliches Backup!</p>
+                <p><strong>Aktueller Monat: <span id="currentMonthName"></span></strong></p>
+                <p>Mit einem Klick wird deine Excel-Datei heruntergeladen. Power Automate verschiebt sie dann automatisch nach OneDrive.</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="createMonthlyBackup()">✅ Ja, Backup erstellen</button>
+                <button class="btn" onclick="remindLater()">⏰ Später erinnern</button>
+                <button class="btn btn-delete" onclick="closeBackupModal()">❌ Nicht jetzt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Power Automate Anleitung Modal -->
+    <div id="powerAutomateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">🤖 Power Automate Einrichtung</div>
+            <div class="modal-body">
+                <h4>So richtest du automatisches OneDrive-Backup ein:</h4>
+                <ol style="line-height: 2;">
+                    <li>Gehe zu <a href="https://make.powerautomate.com" target="_blank">make.powerautomate.com</a></li>
+                    <li>Klicke auf "+ Erstellen" → "Automatisierter Cloud-Flow"</li>
+                    <li><strong>Trigger:</strong> "Wenn eine Datei erstellt wird (OneDrive)"</li>
+                    <li><strong>Ordner:</strong> Downloads (oder wo dein Browser speichert)</li>
+                    <li><strong>Bedingung hinzufügen:</strong> Dateiname enthält "Fahrtenbuch_"</li>
+                    <li><strong>Aktion:</strong> "Datei kopieren" → Ziel: OneDrive/Fahrtenbücher/</li>
+                    <li><strong>Optional:</strong> "Datei löschen" aus Downloads</li>
+                    <li>Flow speichern und aktivieren ✅</li>
+                </ol>
+                <p style="margin-top: 15px;"><strong>Fertig!</strong> Ab jetzt werden Backups automatisch verschoben.</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="closePowerAutomateModal()">👍 Verstanden</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>📋 Fahrtenbuch System</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('arbeit')">💼 Fahrtenbuch Caritas</button>
+            <button class="tab" onclick="switchTab('friseur')">💇 Fahrtenbuch Friseur</button>
+            <button class="tab" onclick="switchTab('standard-caritas')">🚗 Standardfahrten Caritas</button>
+            <button class="tab" onclick="switchTab('standard-friseur')">✂️ Standardfahrten Friseur</button>
+            <button class="tab" onclick="switchTab('klienten')">👥 Klienten-Daten</button>
+            <button class="tab" onclick="switchTab('export')">📥 Export & Backup</button>
+        </div>
+
+        <!-- Tab: Fahrtenbuch Caritas -->
+        <div id="tab-arbeit" class="tab-content active">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Fahrtenbuch Caritas (Arbeit)</h2>
+            
+            <div class="month-selector">
+                <h3>📅 Monat auswählen:</h3>
+                <div class="month-grid" id="monthSelectorArbeit"></div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Gesamt KM (gewählte Monate)</h3>
+                    <div class="value" id="arbeitKmTotal">0</div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table id="arbeitTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Datum</th>
+                            <th style="width: 200px;">Fahrt wählen</th>
+                            <th>Startort</th>
+                            <th>Zielort</th>
+                            <th style="width: 100px;">KM</th>
+                            <th>Bemerkung</th>
+                        </tr>
+                    </thead>
+                    <tbody id="arbeitBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab: Fahrtenbuch Friseur -->
+        <div id="tab-friseur" class="tab-content">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Fahrtenbuch Friseur</h2>
+            
+            <div class="month-selector">
+                <h3>📅 Monat auswählen:</h3>
+                <div class="month-grid" id="monthSelectorFriseur"></div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Gesamt KM (gewählte Monate)</h3>
+                    <div class="value" id="friseurKmTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Gesamt Einnahmen</h3>
+                    <div class="value" id="friseurEinnahmenTotal">0 €</div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table id="friseurTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Datum</th>
+                            <th style="width: 200px;">Fahrt wählen</th>
+                            <th>Startort</th>
+                            <th>Zielort</th>
+                            <th style="width: 100px;">KM</th>
+                            <th style="width: 120px;">Einnahmen (€)</th>
+                            <th>Bemerkung</th>
+                        </tr>
+                    </thead>
+                    <tbody id="friseurBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab: Standardfahrten Caritas -->
+        <div id="tab-standard-caritas" class="tab-content">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Standardfahrten Caritas (Arbeit)</h2>
+            <p style="margin-bottom: 20px; color: #666;">Hier kannst du häufig genutzte Fahrten für deine Arbeit bei Caritas speichern.</p>
+            
+            <div class="table-container">
+                <table id="standardCaritasTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px;">Name</th>
+                            <th>Startort</th>
+                            <th>Zielort</th>
+                            <th style="width: 100px;">KM</th>
+                            <th>Bemerkung</th>
+                            <th style="width: 100px;">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="standardCaritasBody"></tbody>
+                </table>
+            </div>
+            <button class="btn" onclick="addStandardRoute('caritas')">➕ Neue Standardfahrt hinzufügen</button>
+        </div>
+
+        <!-- Tab: Standardfahrten Friseur -->
+        <div id="tab-standard-friseur" class="tab-content">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Standardfahrten Friseur</h2>
+            <p style="margin-bottom: 20px; color: #666;">Hier kannst du häufig genutzte Fahrten für deine Friseur-Tätigkeit speichern.</p>
+            
+            <div class="table-container">
+                <table id="standardFriseurTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px;">Name</th>
+                            <th>Startort</th>
+                            <th>Zielort</th>
+                            <th style="width: 100px;">KM</th>
+                            <th>Bemerkung</th>
+                            <th style="width: 100px;">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="standardFriseurBody"></tbody>
+                </table>
+            </div>
+            <button class="btn" onclick="addStandardRoute('friseur')">➕ Neue Standardfahrt hinzufügen</button>
+        </div>
+
+        <!-- Tab: Klienten-Daten -->
+        <div id="tab-klienten" class="tab-content">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Klienten-Daten</h2>
+            <p style="margin-bottom: 20px; color: #666;">Verwalte hier deine Klienten. Diese stehen dann in den Fahrtenbüchern zur Auswahl.</p>
+            
+            <div class="table-container">
+                <table id="klientenTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 200px;">Klienten-Name</th>
+                            <th>Adresse</th>
+                            <th>Telefon</th>
+                            <th>Notizen</th>
+                            <th style="width: 100px;">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="klientenBody"></tbody>
+                </table>
+            </div>
+            <button class="btn" onclick="addKlient()">➕ Neuen Klienten hinzufügen</button>
+        </div>
+
+        <!-- Tab: Export -->
+        <div id="tab-export" class="tab-content">
+            <h2 style="color: #667eea; margin-bottom: 20px;">📥 Export & Backup-System</h2>
+            
+            <!-- Backup-Verwaltung -->
+            <div class="info-box">
+                <h4>🛡️ Automatisches Backup-System</h4>
+                <p><strong>Letztes Backup:</strong> <span id="lastBackupDisplay">Noch keins erstellt</span></p>
+                <p><strong>Nächste Erinnerung:</strong> <span id="nextReminderDisplay">Ende des Monats</span></p>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-success" onclick="createMonthlyBackup()" style="font-size: 18px; padding: 15px 40px;">
+                    📅 Monatsbackup jetzt erstellen
+                </button>
+                <button class="btn btn-info" onclick="showPowerAutomateGuide()">
+                    🤖 Power Automate Anleitung
+                </button>
+            </div>
+
+            <!-- Jahresauswertung -->
+            <div class="jahresauswertung">
+                <h3>📊 Jahresauswertung 2026 (Finanzamt)</h3>
+                
+                <div class="auswertung-grid">
+                    <div class="auswertung-item">
+                        <label>Caritas - Gesamt KM</label>
+                        <div class="value" id="jahresKmCaritas">0</div>
+                    </div>
+                    <div class="auswertung-item">
+                        <label>Caritas - Anzahl Fahrten</label>
+                        <div class="value" id="jahresFahrtenCaritas">0</div>
+                    </div>
+                    <div class="auswertung-item">
+                        <label>Friseur - Gesamt KM</label>
+                        <div class="value" id="jahresKmFriseur">0</div>
+                    </div>
+                    <div class="auswertung-item">
+                        <label>Friseur - Anzahl Fahrten</label>
+                        <div class="value" id="jahresFahrtenFriseur">0</div>
+                    </div>
+                    <div class="auswertung-item">
+                        <label>Friseur - Gesamt Einnahmen</label>
+                        <div class="value" id="jahresEinnahmenFriseur">0 €</div>
+                    </div>
+                    <div class="auswertung-item">
+                        <label>Gesamt KM (beide)</label>
+                        <div class="value" id="jahresKmGesamt">0</div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-warning" onclick="berechneJahresauswertung()">🔄 Jahresauswertung aktualisieren</button>
+            </div>
+
+            <h3 style="color: #667eea; margin: 30px 0 15px 0;">Weitere Export-Optionen</h3>
+            
+            <div class="button-group">
+                <button class="btn" onclick="exportToExcel()">
+                    📥 Komplettes Jahres-Excel herunterladen
+                </button>
+                <button class="btn" onclick="exportJSON()">
+                    💾 Alle Daten als JSON exportieren
+                </button>
+                <button class="btn" onclick="document.getElementById('jsonImport').click()">
+                    📤 JSON-Daten importieren
+                </button>
+                <input type="file" id="jsonImport" accept=".json" style="display: none;" onchange="importJSON(event)">
+            </div>
+
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-top: 30px;">
+                <h3 style="color: #667eea; margin-bottom: 15px;">ℹ️ Hinweise zum Backup-System:</h3>
+                <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
+                    <li><strong>Automatische Erinnerung:</strong> Am 28. jeden Monats erscheint eine Erinnerung fürs Backup</li>
+                    <li><strong>One-Click Backup:</strong> Ein Klick lädt die Excel-Datei mit dem Monatsnamen herunter</li>
+                    <li><strong>Power Automate:</strong> Richtet du einmalig ein (5 Min.), dann werden Backups automatisch nach OneDrive verschoben</li>
+                    <li><strong>JSON Export/Import:</strong> Sichere ALLE Daten (inkl. Browser-Speicher) für Notfälle oder Gerätewechsel</li>
+                    <li><strong>Wöchentliche Auto-Saves:</strong> Jeden Sonntag werden deine Daten automatisch im Browser neu gesichert</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let standardRoutesCaritas = [];
+        let standardRoutesFriseur = [];
+        let klienten = [];
+
+        const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
+                       'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+        
+        let selectedMonthsArbeit = [0];
+        let selectedMonthsFriseur = [0];
+        let arbeitData = {};
+        let friseurData = {};
+        let lastBackupDate = null;
+        let nextReminderDate = null;
+
+        // Backup-System
+        function checkBackupReminder() {
+            const today = new Date();
+            const day = today.getDate();
+            
+            // Am 28. des Monats erinnern
+            if (day === 28 && (!nextReminderDate || today >= new Date(nextReminderDate))) {
+                showBackupModal();
+            }
+            
+            updateBackupStatus();
+        }
+
+        function showBackupModal() {
+            const modal = document.getElementById('backupModal');
+            const monthName = months[new Date().getMonth()];
+            document.getElementById('currentMonthName').textContent = monthName;
+            modal.style.display = 'block';
+        }
+
+        function closeBackupModal() {
+            document.getElementById('backupModal').style.display = 'none';
+        }
+
+        function remindLater() {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            nextReminderDate = tomorrow.toISOString();
+            localStorage.setItem('nextReminderDate', nextReminderDate);
+            closeBackupModal();
+        }
+
+        function createMonthlyBackup() {
+            const today = new Date();
+            const monthName = months[today.getMonth()];
+            const year = today.getFullYear();
+            
+            // Excel exportieren mit Monatsnamen
+            exportToExcel(`Fahrtenbuch_${monthName}_${year}.xlsx`);
+            
+            // Backup-Datum speichern
+            lastBackupDate = today.toISOString();
+            localStorage.setItem('lastBackupDate', lastBackupDate);
+            
+            // Nächste Erinnerung auf nächsten Monat setzen
+            const nextMonth = new Date(year, today.getMonth() + 1, 28);
+            nextReminderDate = nextMonth.toISOString();
+            localStorage.setItem('nextReminderDate', nextReminderDate);
+            
+            updateBackupStatus();
+            closeBackupModal();
+            
+            // Erfolgsanzeige
+            const indicator = document.getElementById('saveIndicator');
+            indicator.textContent = '✅ Monatsbackup erstellt!';
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+                indicator.textContent = '💾 Automatisch gespeichert!';
+            }, 3000);
+        }
+
+        function updateBackupStatus() {
+            lastBackupDate = localStorage.getItem('lastBackupDate');
+            nextReminderDate = localStorage.getItem('nextReminderDate');
+            
+            const backupStatus = document.getElementById('backupStatus');
+            const lastBackupDisplay = document.getElementById('lastBackupDisplay');
+            const nextReminderDisplay = document.getElementById('nextReminderDisplay');
+            
+            if (lastBackupDate) {
+                const date = new Date(lastBackupDate);
+                const formatted = `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
+                backupStatus.textContent = `📅 Letztes Backup: ${formatted}`;
+                if (lastBackupDisplay) lastBackupDisplay.textContent = formatted;
+            } else {
+                backupStatus.textContent = '📅 Letztes Backup: Noch keins erstellt';
+                if (lastBackupDisplay) lastBackupDisplay.textContent = 'Noch keins erstellt';
+            }
+            
+            if (nextReminderDate) {
+                const date = new Date(nextReminderDate);
+                const formatted = `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
+                if (nextReminderDisplay) nextReminderDisplay.textContent = formatted;
+            }
+        }
+
+        function showPowerAutomateGuide() {
+            document.getElementById('powerAutomateModal').style.display = 'block';
+        }
+
+        function closePowerAutomateModal() {
+            document.getElementById('powerAutomateModal').style.display = 'none';
+        }
+
+        // JSON Export/Import
+        function exportJSON() {
+            collectArbeitData();
+            collectFriseurData();
+            
+            const data = {
+                standardRoutesCaritas,
+                standardRoutesFriseur,
+                klienten,
+                selectedMonthsArbeit,
+                selectedMonthsFriseur,
+                arbeitData,
+                friseurData,
+                lastBackupDate,
+                nextReminderDate,
+                exportDate: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Fahrtenbuch_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            showSaveIndicator('💾 JSON-Backup erstellt!');
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Daten importieren
+                    standardRoutesCaritas = data.standardRoutesCaritas || [];
+                    standardRoutesFriseur = data.standardRoutesFriseur || [];
+                    klienten = data.klienten || [];
+                    selectedMonthsArbeit = data.selectedMonthsArbeit || [0];
+                    selectedMonthsFriseur = data.selectedMonthsFriseur || [0];
+                    arbeitData = data.arbeitData || {};
+                    friseurData = data.friseurData || {};
+                    lastBackupDate = data.lastBackupDate || null;
+                    nextReminderDate = data.nextReminderDate || null;
+                    
+                    saveToLocalStorage();
+                    
+                    // UI neu laden
+                    renderStandardRoutes('caritas');
+                    renderStandardRoutes('friseur');
+                    renderKlienten();
+                    createMonthSelector('arbeit');
+                    createMonthSelector('friseur');
+                    renderArbeitMonth();
+                    renderFriseurMonth();
+                    berechneJahresauswertung();
+                    updateBackupStatus();
+                    
+                    showSaveIndicator('✅ Daten erfolgreich importiert!');
+                } catch (error) {
+                    alert('Fehler beim Importieren der Daten: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // Wöchentliches Auto-Save
+        function weeklyAutoSave() {
+            const today = new Date();
+            const lastAutoSave = localStorage.getItem('lastAutoSave');
+            
+            if (!lastAutoSave || (new Date() - new Date(lastAutoSave)) > 7 * 24 * 60 * 60 * 1000) {
+                saveToLocalStorage();
+                localStorage.setItem('lastAutoSave', today.toISOString());
+                showSaveIndicator('🔄 Wöchentliche Sicherung abgeschlossen!');
+            }
+        }
+
+        // Automatisches Speichern
+        function saveToLocalStorage() {
+            collectArbeitData();
+            collectFriseurData();
+            
+            const data = {
+                standardRoutesCaritas,
+                standardRoutesFriseur,
+                klienten,
+                selectedMonthsArbeit,
+                selectedMonthsFriseur,
+                arbeitData,
+                friseurData
+            };
+            localStorage.setItem('fahrtenbuch_data', JSON.stringify(data));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('fahrtenbuch_data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                standardRoutesCaritas = data.standardRoutesCaritas || [];
+                standardRoutesFriseur = data.standardRoutesFriseur || [];
+                klienten = data.klienten || [];
+                selectedMonthsArbeit = data.selectedMonthsArbeit || [0];
+                selectedMonthsFriseur = data.selectedMonthsFriseur || [0];
+                arbeitData = data.arbeitData || {};
+                friseurData = data.friseurData || {};
+            } else {
+                standardRoutesCaritas = [
+                    { name: "Heim-Caritas", start: "Hauptstraße 1, Berlin", ziel: "Caritas Zentrum, Berlin", km: 12, bemerkung: "Tägliche Arbeitsfahrt" }
+                ];
+                standardRoutesFriseur = [
+                    { name: "Heim-Salon", start: "Hauptstraße 1, Berlin", ziel: "Friseursalon Schick, Berlin", km: 8, bemerkung: "Zum Salon" }
+                ];
+                klienten = [
+                    { name: "Musterklient", adresse: "Musterstraße 123", telefon: "030-12345678", notizen: "Stammkunde" }
+                ];
+            }
+            
+            lastBackupDate = localStorage.getItem('lastBackupDate');
+            nextReminderDate = localStorage.getItem('nextReminderDate');
+        }
+
+        function showSaveIndicator(text = '💾 Automatisch gespeichert!') {
+            const indicator = document.getElementById('saveIndicator');
+            indicator.textContent = text;
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+
+        function collectArbeitData() {
+            document.querySelectorAll('#arbeitTable tbody tr').forEach(row => {
+                const datum = row.cells[0].textContent;
+                const fahrt = row.cells[1].querySelector('select').value;
+                const start = row.cells[2].querySelector('input').value;
+                const ziel = row.cells[3].querySelector('input').value;
+                const km = row.cells[4].querySelector('input').value;
+                const bem = row.cells[5].querySelector('input').value;
+                
+                if (!arbeitData[datum]) arbeitData[datum] = [];
+                
+                const rowsForDate = Array.from(document.querySelectorAll('#arbeitTable tbody tr')).filter(r => r.cells[0].textContent === datum);
+                const tripIndex = rowsForDate.indexOf(row);
+                
+                arbeitData[datum][tripIndex] = { fahrt, start, ziel, km, bem };
+            });
+        }
+
+        function collectFriseurData() {
+            document.querySelectorAll('#friseurTable tbody tr').forEach(row => {
+                const datum = row.cells[0].textContent;
+                const fahrt = row.cells[1].querySelector('select').value;
+                const start = row.cells[2].querySelector('input').value;
+                const ziel = row.cells[3].querySelector('input').value;
+                const km = row.cells[4].querySelector('input').value;
+                const einnahmen = row.cells[5].querySelector('input').value;
+                const bem = row.cells[6].querySelector('input').value;
+                
+                if (!friseurData[datum]) friseurData[datum] = [];
+                
+                const rowsForDate = Array.from(document.querySelectorAll('#friseurTable tbody tr')).filter(r => r.cells[0].textContent === datum);
+                const tripIndex = rowsForDate.indexOf(row);
+                
+                friseurData[datum][tripIndex] = { fahrt, start, ziel, km, einnahmen, bem };
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        function isWeekend(date) {
+            const day = date.getDay();
+            return day === 0 || day === 6;
+        }
+
+        function createMonthSelector(type) {
+            const container = document.getElementById(type === 'arbeit' ? 'monthSelectorArbeit' : 'monthSelectorFriseur');
+            container.innerHTML = '';
+            
+            months.forEach((month, index) => {
+                const div = document.createElement('div');
+                div.className = 'month-checkbox';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `${type}-month-${index}`;
+                checkbox.checked = index === 0;
+                checkbox.onchange = () => toggleMonth(type, index);
+                
+                const label = document.createElement('label');
+                label.htmlFor = `${type}-month-${index}`;
+                label.textContent = month;
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                container.appendChild(div);
+            });
+        }
+
+        function toggleMonth(type, monthIndex) {
+            if (type === 'arbeit') {
+                collectArbeitData();
+            } else {
+                collectFriseurData();
+            }
+            
+            const selectedMonths = type === 'arbeit' ? selectedMonthsArbeit : selectedMonthsFriseur;
+            const index = selectedMonths.indexOf(monthIndex);
+            
+            if (index > -1) {
+                selectedMonths.splice(index, 1);
+            } else {
+                selectedMonths.push(monthIndex);
+            }
+            
+            selectedMonths.sort((a, b) => a - b);
+            
+            if (type === 'arbeit') {
+                renderArbeitMonth();
+            } else {
+                renderFriseurMonth();
+            }
+            saveToLocalStorage();
+        }
+
+        function renderStandardRoutes(type) {
+            const routes = type === 'caritas' ? standardRoutesCaritas : standardRoutesFriseur;
+            const tbody = document.getElementById(type === 'caritas' ? 'standardCaritasBody' : 'standardFriseurBody');
+            tbody.innerHTML = '';
+            
+            routes.forEach((route, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><input type="text" value="${route.name}" onchange="updateStandardRoute('${type}', ${index}, 'name', this.value)"></td>
+                    <td><input type="text" value="${route.start}" onchange="updateStandardRoute('${type}', ${index}, 'start', this.value)"></td>
+                    <td><input type="text" value="${route.ziel}" onchange="updateStandardRoute('${type}', ${index}, 'ziel', this.value)"></td>
+                    <td><input type="number" value="${route.km}" onchange="updateStandardRoute('${type}', ${index}, 'km', this.value)"></td>
+                    <td><input type="text" value="${route.bemerkung}" onchange="updateStandardRoute('${type}', ${index}, 'bemerkung', this.value)"></td>
+                    <td><button class="btn btn-delete" onclick="deleteStandardRoute('${type}', ${index})">🗑️</button></td>
+                `;
+            });
+        }
+
+        function updateStandardRoute(type, index, field, value) {
+            const routes = type === 'caritas' ? standardRoutesCaritas : standardRoutesFriseur;
+            routes[index][field] = field === 'km' ? parseFloat(value) : value;
+            if (type === 'caritas') {
+                renderArbeitMonth();
+            } else {
+                renderFriseurMonth();
+            }
+            saveToLocalStorage();
+        }
+
+        function addStandardRoute(type) {
+            const routes = type === 'caritas' ? standardRoutesCaritas : standardRoutesFriseur;
+            routes.push({ name: "Neue Fahrt", start: "", ziel: "", km: 0, bemerkung: "" });
+            renderStandardRoutes(type);
+            if (type === 'caritas') {
+                renderArbeitMonth();
+            } else {
+                renderFriseurMonth();
+            }
+            saveToLocalStorage();
+        }
+
+        function deleteStandardRoute(type, index) {
+            if (confirm('Möchtest du diese Standardfahrt wirklich löschen?')) {
+                const routes = type === 'caritas' ? standardRoutesCaritas : standardRoutesFriseur;
+                routes.splice(index, 1);
+                renderStandardRoutes(type);
+                if (type === 'caritas') {
+                    renderArbeitMonth();
+                } else {
+                    renderFriseurMonth();
+                }
+                saveToLocalStorage();
+            }
+        }
+
+        function renderKlienten() {
+            const tbody = document.getElementById('klientenBody');
+            tbody.innerHTML = '';
+            
+            klienten.forEach((klient, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><input type="text" value="${klient.name}" onchange="updateKlient(${index}, 'name', this.value)"></td>
+                    <td><input type="text" value="${klient.adresse}" onchange="updateKlient(${index}, 'adresse', this.value)"></td>
+                    <td><input type="text" value="${klient.telefon}" onchange="updateKlient(${index}, 'telefon', this.value)"></td>
+                    <td><input type="text" value="${klient.notizen}" onchange="updateKlient(${index}, 'notizen', this.value)"></td>
+                    <td><button class="btn btn-delete" onclick="deleteKlient(${index})">🗑️</button></td>
+                `;
+            });
+        }
+
+        function updateKlient(index, field, value) {
+            klienten[index][field] = value;
+            renderArbeitMonth();
+            renderFriseurMonth();
+            saveToLocalStorage();
+        }
+
+        function addKlient() {
+            klienten.push({ name: "Neuer Klient", adresse: "", telefon: "", notizen: "" });
+            renderKlienten();
+            renderArbeitMonth();
+            renderFriseurMonth();
+            saveToLocalStorage();
+        }
+
+        function deleteKlient(index) {
+            if (confirm('Möchtest du diesen Klienten wirklich löschen?')) {
+                klienten.splice(index, 1);
+                renderKlienten();
+                renderArbeitMonth();
+                renderFriseurMonth();
+                saveToLocalStorage();
+            }
+        }
+
+        function createKlientSelect(dateStr, tripIndex, savedValue = '') {
+            const select = document.createElement('select');
+            select.innerHTML = '<option value="">-- Kein Klient --</option>';
+            
+            klienten.forEach((klient) => {
+                select.innerHTML += `<option value="${klient.name}">${klient.name}</option>`;
+            });
+            
+            select.value = savedValue || '';
+            select.onchange = () => saveToLocalStorage();
+            
+            return select;
+        }
+
+        function createRouteSelect(type, dateStr, tripIndex) {
+            const select = document.createElement('select');
+            select.innerHTML = '<option value="">-- Bitte wählen --</option>';
+            
+            const routes = type === 'friseur' ? standardRoutesFriseur : standardRoutesCaritas;
+            routes.forEach((route) => {
+                select.innerHTML += `<option value="${route.name}">${route.name}</option>`;
+            });
+            
+            const savedData = type === 'friseur' ? friseurData : arbeitData;
+            if (savedData[dateStr] && savedData[dateStr][tripIndex]) {
+                select.value = savedData[dateStr][tripIndex].fahrt || '';
+            }
+            
+            select.onchange = function() {
+                const routeName = this.value;
+                const route = routes.find(r => r.name === routeName);
+                
+                if (route) {
+                    const row = this.closest('tr');
+                    row.cells[2].querySelector('input').value = route.start;
+                    row.cells[3].querySelector('input').value = route.ziel;
+                    row.cells[4].querySelector('input').value = route.km;
+                    const bemerkungIndex = type === 'friseur' ? 6 : 5;
+                    row.cells[bemerkungIndex].querySelector('input').value = route.bemerkung;
+                    updateStats();
+                    saveToLocalStorage();
+                }
+            };
+            return select;
+        }
+
+        function renderArbeitMonth() {
+            const tbody = document.getElementById('arbeitBody');
+            tbody.innerHTML = '';
+            const year = 2026;
+
+            selectedMonthsArbeit.forEach(month => {
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const date = new Date(year, month, day);
+                    const dateStr = `${day}.${month + 1}.${year}`;
+                    
+                    const row1 = tbody.insertRow();
+                    if (isWeekend(date)) row1.classList.add('weekend');
+                    
+                    const savedTrip0 = arbeitData[dateStr] && arbeitData[dateStr][0] ? arbeitData[dateStr][0] : {};
+                    row1.innerHTML = `
+                        <td>${dateStr}</td>
+                        <td></td>
+                        <td><input type="text" placeholder="Startort" value="${savedTrip0.start || ''}" onchange="saveToLocalStorage()"></td>
+                        <td><input type="text" placeholder="Zielort" value="${savedTrip0.ziel || ''}" onchange="saveToLocalStorage()"></td>
+                        <td><input type="number" value="${savedTrip0.km || 0}" min="0" onchange="updateStats(); saveToLocalStorage()"></td>
+                        <td><input type="text" placeholder="Bemerkung" value="${savedTrip0.bem || ''}" onchange="saveToLocalStorage()"></td>
+                    `;
+                    row1.cells[1].appendChild(createRouteSelect('caritas', dateStr, 0));
+
+                    const row2 = tbody.insertRow();
+                    if (isWeekend(date)) row2.classList.add('weekend');
+                    
+                    const savedTrip1 = arbeitData[dateStr] && arbeitData[dateStr][1] ? arbeitData[dateStr][1] : {};
+                    row2.innerHTML = `
+                        <td>${dateStr}</td>
+                        <td></td>
+                        <td><input type="text" placeholder="Startort" value="${savedTrip1.start || ''}" onchange="saveToLocalStorage()"></td>
+                        <td><input type="text" placeholder="Zielort" value="${savedTrip1.ziel || ''}" onchange="saveToLocalStorage()"></td>
+                        <td><input type="number" value="${savedTrip1.km || 0}" min="0" onchange="updateStats(); saveToLocalStorage()"></td>
+                        <td><input type="text" placeholder="Bemerkung" value="${savedTrip1.bem || ''}" onchange="saveToLocalStorage()"></td>
+                    `;
+                    row2.cells[1].appendChild(createRouteSelect('caritas', dateStr, 1));
+                }
+            });
+            updateStats();
+        }
+
+        function renderFriseurMonth() {
+            const tbody = document.getElementById('friseurBody');
+            tbody.innerHTML = '';
+            const year = 2026;
+
+            selectedMonthsFriseur.forEach(month => {
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const date = new Date(year, month, day);
+                    const dateStr = `${day}.${month + 1}.${year}`;
+                    
+                    for (let trip = 0; trip < 3; trip++) {
+                        const row = tbody.insertRow();
+                        if (isWeekend(date)) row.classList.add('weekend');
+                        
+                        const savedTrip = friseurData[dateStr] && friseurData[dateStr][trip] ? friseurData[dateStr][trip] : {};
+                        row.innerHTML = `
+                            <td>${dateStr}</td>
+                            <td></td>
+                            <td><input type="text" placeholder="Startort" value="${savedTrip.start || ''}" onchange="saveToLocalStorage()"></td>
+                            <td><input type="text" placeholder="Zielort" value="${savedTrip.ziel || ''}" onchange="saveToLocalStorage()"></td>
+                            <td><input type="number" value="${savedTrip.km || 0}" min="0" onchange="updateStats(); saveToLocalStorage()"></td>
+                            <td><input type="number" value="${savedTrip.einnahmen || 0}" min="0" step="0.01" onchange="updateStats(); saveToLocalStorage()"></td>
+                            <td><input type="text" placeholder="Bemerkung" value="${savedTrip.bem || ''}" onchange="saveToLocalStorage()"></td>
+                        `;
+                        row.cells[1].appendChild(createRouteSelect('friseur', dateStr, trip));
+                    }
+                }
+            });
+            updateStats();
+        }
+
+        function updateStats() {
+            let arbeitKm = 0;
+            document.querySelectorAll('#arbeitTable tbody tr').forEach(row => {
+                const km = parseFloat(row.cells[4].querySelector('input').value) || 0;
+                arbeitKm += km;
+            });
+            document.getElementById('arbeitKmTotal').textContent = arbeitKm.toFixed(2);
+
+            let friseurKm = 0;
+            let friseurEinnahmen = 0;
+            document.querySelectorAll('#friseurTable tbody tr').forEach(row => {
+                const km = parseFloat(row.cells[4].querySelector('input').value) || 0;
+                const einnahmen = parseFloat(row.cells[5].querySelector('input').value) || 0;
+                friseurKm += km;
+                friseurEinnahmen += einnahmen;
+            });
+            document.getElementById('friseurKmTotal').textContent = friseurKm.toFixed(2);
+            document.getElementById('friseurEinnahmenTotal').textContent = friseurEinnahmen.toFixed(2) + ' €';
+        }
+
+        function berechneJahresauswertung() {
+            collectArbeitData();
+            collectFriseurData();
+            
+            let caritasKm = 0;
+            let caritasFahrten = 0;
+            let friseurKm = 0;
+            let friseurFahrten = 0;
+            let friseurEinnahmen = 0;
+
+            Object.values(arbeitData).forEach(trips => {
+                trips.forEach(trip => {
+                    const km = parseFloat(trip.km) || 0;
+                    if (km > 0) {
+                        caritasKm += km;
+                        caritasFahrten++;
+                    }
+                });
+            });
+
+            Object.values(friseurData).forEach(trips => {
+                trips.forEach(trip => {
+                    const km = parseFloat(trip.km) || 0;
+                    const einnahmen = parseFloat(trip.einnahmen) || 0;
+                    if (km > 0) {
+                        friseurKm += km;
+                        friseurFahrten++;
+                    }
+                    friseurEinnahmen += einnahmen;
+                });
+            });
+
+            document.getElementById('jahresKmCaritas').textContent = caritasKm.toFixed(2);
+            document.getElementById('jahresFahrtenCaritas').textContent = caritasFahrten;
+            document.getElementById('jahresKmFriseur').textContent = friseurKm.toFixed(2);
+            document.getElementById('jahresFahrtenFriseur').textContent = friseurFahrten;
+            document.getElementById('jahresEinnahmenFriseur').textContent = friseurEinnahmen.toFixed(2) + ' €';
+            document.getElementById('jahresKmGesamt').textContent = (caritasKm + friseurKm).toFixed(2);
+        }
+
+        function exportToExcel(filename = 'Fahrtenbuch.xlsx') {
+            collectArbeitData();
+            collectFriseurData();
+            berechneJahresauswertung();
+            
+            const wb = XLSX.utils.book_new();
+
+            const jahresData = [
+                ['Jahresauswertung 2026 - Finanzamt'],
+                [''],
+                ['Kategorie', 'Wert'],
+                ['Caritas - Gesamt KM', document.getElementById('jahresKmCaritas').textContent],
+                ['Caritas - Anzahl Fahrten', document.getElementById('jahresFahrtenCaritas').textContent],
+                ['Friseur - Gesamt KM', document.getElementById('jahresKmFriseur').textContent],
+                ['Friseur - Anzahl Fahrten', document.getElementById('jahresFahrtenFriseur').textContent],
+                ['Friseur - Gesamt Einnahmen', document.getElementById('jahresEinnahmenFriseur').textContent],
+                ['Gesamt KM (beide)', document.getElementById('jahresKmGesamt').textContent]
+            ];
+            const wsJahres = XLSX.utils.aoa_to_sheet(jahresData);
+            XLSX.utils.book_append_sheet(wb, wsJahres, 'Jahresauswertung');
+
+            const standardCaritasData = [['Name', 'Startort', 'Zielort', 'KM', 'Bemerkung']];
+            standardRoutesCaritas.forEach(route => {
+                standardCaritasData.push([route.name, route.start, route.ziel, route.km, route.bemerkung]);
+            });
+            const wsStandardCaritas = XLSX.utils.aoa_to_sheet(standardCaritasData);
+            XLSX.utils.book_append_sheet(wb, wsStandardCaritas, 'Standardfahrten Caritas');
+
+            const standardFriseurData = [['Name', 'Startort', 'Zielort', 'KM', 'Bemerkung']];
+            standardRoutesFriseur.forEach(route => {
+                standardFriseurData.push([route.name, route.start, route.ziel, route.km, route.bemerkung]);
+            });
+            const wsStandardFriseur = XLSX.utils.aoa_to_sheet(standardFriseurData);
+            XLSX.utils.book_append_sheet(wb, wsStandardFriseur, 'Standardfahrten Friseur');
+
+            const klientenData = [['Name', 'Adresse', 'Telefon', 'Notizen']];
+            klienten.forEach(klient => {
+                klientenData.push([klient.name, klient.adresse, klient.telefon, klient.notizen]);
+            });
+            const wsKlienten = XLSX.utils.aoa_to_sheet(klientenData);
+            XLSX.utils.book_append_sheet(wb, wsKlienten, 'Klienten');
+
+            const arbeitDataExport = [['Datum', 'Fahrt', 'Startort', 'Zielort', 'KM', 'Bemerkung']];
+            const year = 2026;
+            
+            for (let month = 0; month < 12; month++) {
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dateStr = `${day}.${month + 1}.${year}`;
+                    
+                    if (arbeitData[dateStr] && arbeitData[dateStr][0]) {
+                        const trip = arbeitData[dateStr][0];
+                        arbeitDataExport.push([dateStr, trip.fahrt || '', trip.start || '', trip.ziel || '', parseFloat(trip.km) || 0, trip.bem || '']);
+                    } else {
+                        arbeitDataExport.push([dateStr, '', '', '', 0, '']);
+                    }
+                    
+                    if (arbeitData[dateStr] && arbeitData[dateStr][1]) {
+                        const trip = arbeitData[dateStr][1];
+                        arbeitDataExport.push([dateStr, trip.fahrt || '', trip.start || '', trip.ziel || '', parseFloat(trip.km) || 0, trip.bem || '']);
+                    } else {
+                        arbeitDataExport.push([dateStr, '', '', '', 0, '']);
+                    }
+                }
+            }
+            
+            const wsArbeit = XLSX.utils.aoa_to_sheet(arbeitDataExport);
+            XLSX.utils.book_append_sheet(wb, wsArbeit, 'Fahrtenbuch Caritas');
+
+            const friseurDataExport = [['Datum', 'Fahrt', 'Startort', 'Zielort', 'KM', 'Einnahmen (€)', 'Bemerkung']];
+            
+            for (let month = 0; month < 12; month++) {
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dateStr = `${day}.${month + 1}.${year}`;
+                    
+                    for (let trip = 0; trip < 3; trip++) {
+                        if (friseurData[dateStr] && friseurData[dateStr][trip]) {
+                            const tripData = friseurData[dateStr][trip];
+                            friseurDataExport.push([dateStr, tripData.fahrt || '', tripData.start || '', tripData.ziel || '', parseFloat(tripData.km) || 0, parseFloat(tripData.einnahmen) || 0, tripData.bem || '']);
+                        } else {
+                            friseurDataExport.push([dateStr, '', '', '', 0, 0, '']);
+                        }
+                    }
+                }
+            }
+            
+            const wsFriseur = XLSX.utils.aoa_to_sheet(friseurDataExport);
+            XLSX.utils.book_append_sheet(wb, wsFriseur, 'Fahrtenbuch Friseur');
+
+            XLSX.writeFile(wb, filename);
+        }
+
+        // Initial render
+        loadFromLocalStorage();
+        renderStandardRoutes('caritas');
+        renderStandardRoutes('friseur');
+        renderKlienten();
+        createMonthSelector('arbeit');
+        createMonthSelector('friseur');
+        renderArbeitMonth();
+        renderFriseurMonth();
+        berechneJahresauswertung();
+        updateBackupStatus();
+        
+        // Backup-Erinnerung prüfen beim Start
+        checkBackupReminder();
+        
+        // Wöchentliches Auto-Save prüfen
+        weeklyAutoSave();
+        
+        // Täglich Backup-Erinnerung prüfen (alle 24 Stunden)
+        setInterval(checkBackupReminder, 24 * 60 * 60 * 1000);
+        
+        // Wöchentlich Auto-Save (alle 7 Tage)
+        setInterval(weeklyAutoSave, 7 * 24 * 60 * 60 * 1000);
+    </script>
+</body>
+</html>
